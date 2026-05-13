@@ -1,0 +1,9 @@
+{
+	"id": "html-viewer",
+	"name": "HTML Viewer",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Browse HTML files inside Obsidian with sandboxed iframe rendering and local resource support.",
+	"author": "you",
+	"isDesktopOnly": false
+}
