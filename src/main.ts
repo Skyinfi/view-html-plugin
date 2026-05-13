@@ -18,11 +18,12 @@ export default class HtmlViewerPlugin extends Plugin {
 	}
 
 	onunload() {
-		this.app.workspace.detachLeavesOfType(HTML_VIEW_TYPE);
+		// Obsidian unloads registered views; leave workspace layout intact.
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const loadedSettings = await this.loadData() as Partial<HtmlViewerSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedSettings);
 	}
 
 	async saveSettings() {

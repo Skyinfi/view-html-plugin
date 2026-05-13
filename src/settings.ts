@@ -27,8 +27,6 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "HTML Viewer Settings" });
-
 		new Setting(containerEl)
 			.setName("Enable JavaScript")
 			.setDesc("Allow scripts to run inside HTML views. Only enable for trusted HTML files.")
@@ -43,7 +41,7 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Allow external resources")
-			.setDesc("Allow loading resources from external URLs (http/https). When disabled, only vault-local resources are loaded.")
+			.setDesc("Allow loading resources from external web addresses. When disabled, only vault-local resources are loaded.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.allowExternalResources)
@@ -70,7 +68,6 @@ export class HtmlViewerSettingTab extends PluginSettingTab {
 			.setDesc("Comma-separated list of folder paths where JavaScript is always allowed. Overrides the global toggle.")
 			.addText((text) =>
 				text
-					.setPlaceholder("notes/trusted, archive/html")
 					.setValue(this.plugin.settings.trustedFolders)
 					.onChange(async (value) => {
 						this.plugin.settings.trustedFolders = value;

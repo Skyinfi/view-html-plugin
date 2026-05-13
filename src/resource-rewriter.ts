@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, TFile, requestUrl } from "obsidian";
 
 export class ResourceRewriter {
 	constructor(
@@ -12,8 +12,8 @@ export class ResourceRewriter {
 		const doc = parser.parseFromString(htmlContent, "text/html");
 
 		await this.rewriteMediaElements(doc);
-		await this.rewriteLinkElements(doc);
 		await this.inlineStylesheets(doc);
+		await this.rewriteLinkElements(doc);
 		this.rewriteInlineStyles(doc);
 
 		return this.serializeDocument(doc, htmlContent);
@@ -52,11 +52,7 @@ export class ResourceRewriter {
 
 			const rel = (el.getAttribute("rel") || "").toLowerCase();
 
-			if (rel === "stylesheet") {
-				// Stylesheets are inlined separately; remove the link.
-				el.remove();
-				continue;
-			}
+			if (rel === "stylesheet") continue;
 
 			const rewritten = await this.tryRewriteUrl(href);
 			if (rewritten !== null) {
@@ -80,8 +76,8 @@ export class ResourceRewriter {
 			if (this.isAbsoluteUrl(href)) {
 				if (!this.allowExternal) continue;
 				try {
-					const res = await fetch(href);
-					if (res.ok) cssContent = await res.text();
+					const res = await requestUrl(href);
+					cssContent = res.text;
 				} catch {
 					// Ignore fetch errors.
 				}
@@ -116,7 +112,7 @@ export class ResourceRewriter {
 
 	private rewriteCssUrls(css: string, basePath: string): string {
 		// Rewrite url(...)
-		css = css.replace(/url\(\s*['"]?([^'"()\s]+)['"]?\s*\)/g, (match, url) => {
+		css = css.replace(/url\(\s*['"]?([^'"()\s]+)['"]?\s*\)/g, (match: string, url: string): string => {
 			if (this.isAbsoluteUrl(url)) {
 				if (!this.allowExternal && this.isExternalUrl(url)) {
 					return 'url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")';
@@ -132,7 +128,7 @@ export class ResourceRewriter {
 		});
 
 		// Rewrite @import "..." and @import url("...")
-		css = css.replace(/@import\s+(?:url\(\s*['"]?([^'"()\s]+)['"]?\s*\)|['"]([^'"]+)['"])\s*;?/g, (match, url1, url2) => {
+		css = css.replace(/@import\s+(?:url\(\s*['"]?([^'"()\s]+)['"]?\s*\)|['"]([^'"]+)['"])\s*;?/g, (match: string, url1: string | undefined, url2: string | undefined): string => {
 			const url = url1 || url2;
 			if (!url) return match;
 			if (this.isAbsoluteUrl(url)) {

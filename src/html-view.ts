@@ -56,7 +56,7 @@ export class HtmlView extends FileView {
 		});
 		setIcon(refreshBtn, "refresh-cw");
 		refreshBtn.addEventListener("click", () => {
-			if (this.file) this.renderFile(this.file);
+			if (this.file) void this.renderFile(this.file);
 		});
 
 		const sourceBtn = this.toolbarEl.createEl("button", {
@@ -97,6 +97,7 @@ export class HtmlView extends FileView {
 
 			const jsEnabled = this.isJavaScriptEnabled(file);
 			const allowExternal = this.plugin.settings.allowExternalResources;
+			const allowForms = this.plugin.settings.allowForms;
 
 			let html = content;
 			let mode: string;
@@ -109,14 +110,15 @@ export class HtmlView extends FileView {
 				mode = "srcdoc";
 			}
 
-			html = this.injectCsp(html, jsEnabled, allowExternal);
+			html = this.injectCsp(html, jsEnabled, allowExternal, allowForms);
 
 			this.iframeEl = this.viewerContainerEl.createEl("iframe", {
 				cls: "html-viewer-iframe",
 			});
-			this.iframeEl.sandbox.add("");
-			if (jsEnabled) this.iframeEl.sandbox.add("allow-scripts");
-			if (this.plugin.settings.allowForms) this.iframeEl.sandbox.add("allow-forms");
+			const sandboxTokens: string[] = [];
+			if (jsEnabled) sandboxTokens.push("allow-scripts");
+			if (allowForms) sandboxTokens.push("allow-forms");
+			this.iframeEl.setAttribute("sandbox", sandboxTokens.join(" "));
 
 			this.iframeEl.srcdoc = html;
 			this.updateStatus(jsEnabled, mode);
@@ -126,22 +128,31 @@ export class HtmlView extends FileView {
 	}
 
 	private hasRelativeResources(content: string): boolean {
-		// Quick heuristic: look for relative path patterns in common resource attributes.
-		const pattern = /(?:src|href)\s*=\s*["'](?!https?:\/\/|data:|blob:|\/\/|javascript:|mailto:|#|\s*$)[^"']+["']/i;
-		return pattern.test(content);
+		const resourceAttrPattern = /(?:src|href)\s*=\s*["'](?!https?:\/\/|data:|blob:|\/\/|javascript:|mailto:|#|\s*$)[^"']+["']/i;
+		const cssUrlPattern = /url\(\s*["']?(?!https?:\/\/|data:|blob:|\/\/|#)[^"')\s]+["']?\s*\)/i;
+		const cssImportPattern = /@import\s+(?:url\(\s*["']?(?!https?:\/\/|data:|blob:|\/\/)[^"')\s]+["']?\s*\)|["'](?!https?:\/\/|data:|blob:|\/\/)[^"']+["'])/i;
+		return resourceAttrPattern.test(content) || cssUrlPattern.test(content) || cssImportPattern.test(content);
 	}
 
-	private injectCsp(html: string, jsEnabled: boolean, allowExternal: boolean): string {
+	private injectCsp(html: string, jsEnabled: boolean, allowExternal: boolean, allowForms: boolean): string {
+		const resourceSources = allowExternal ? "app: blob: data: http: https:" : "app: blob: data:";
+		const scriptSources = jsEnabled
+			? allowExternal
+				? "app: blob: data: http: https: 'unsafe-inline'"
+				: "app: blob: data: 'unsafe-inline'"
+			: "'none'";
+		const connectSources = allowExternal ? "http: https:" : "'none'";
+		const formActionSources = allowForms ? "http: https:" : "'none'";
 
 		let csp = "default-src 'none'; ";
-		csp += "img-src app: blob: data: " + (allowExternal ? "http: https:; " : "; ");
-		csp += "media-src app: blob: data: " + (allowExternal ? "http: https:; " : "; ");
-		csp += "font-src app: blob: data: " + (allowExternal ? "http: https:; " : "; ");
+		csp += `img-src ${resourceSources}; `;
+		csp += `media-src ${resourceSources}; `;
+		csp += `font-src ${resourceSources}; `;
 		csp += "style-src app: blob: data: 'unsafe-inline'; ";
-		csp += "script-src " + (jsEnabled ? "app: blob: data: 'unsafe-inline'; " : "'none'; ");
-		csp += "connect-src 'none'; ";
+		csp += `script-src ${scriptSources}; `;
+		csp += `connect-src ${connectSources}; `;
 		csp += "frame-src 'none'; ";
-		csp += "form-action 'none';";
+		csp += `form-action ${formActionSources};`;
 
 		const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
 
@@ -192,7 +203,7 @@ export class HtmlView extends FileView {
 		const actions = errorEl.createDiv("html-viewer-error-actions");
 		const reloadBtn = actions.createEl("button", { text: "Reload" });
 		reloadBtn.addEventListener("click", () => {
-			if (this.file) this.renderFile(this.file);
+			if (this.file) void this.renderFile(this.file);
 		});
 
 		if (this.file) {
@@ -202,7 +213,7 @@ export class HtmlView extends FileView {
 	}
 
 	private openSource(file: TFile): void {
-		this.app.workspace.openLinkText(file.path, "", false);
+		void this.app.workspace.openLinkText(file.path, "", false);
 	}
 
 	private openExternally(file: TFile): void {
@@ -210,7 +221,7 @@ export class HtmlView extends FileView {
 		if (electron) {
 			const adapter = this.app.vault.adapter as unknown as { getFullPath: (path: string) => string };
 			const filePath = adapter.getFullPath(file.path);
-			(electron as { shell: { openPath: (path: string) => void } }).shell.openPath(filePath);
+			void (electron as { shell: { openPath: (path: string) => Promise<string> } }).shell.openPath(filePath);
 		} else {
 			window.open(this.app.vault.getResourcePath(file), "_blank");
 		}
